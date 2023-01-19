@@ -7,7 +7,11 @@ using namespace std;
 
 struct Pair{
     char character;
-    int freqeuency;
+    int frequency;
+    Pair(char c, int f){
+        character = c;
+        frequency = f;
+    }
 };
 
 struct Code{
@@ -17,14 +21,13 @@ struct Code{
 
 struct priority {
     bool operator()(Pair* p, Pair* p2){
-        if(p->freqeuency == p2->freqeuency){
-            return (p->character < p2->character);
-        }
-        else{
-            return p->freqeuency > p2->freqeuency;
-        }
+        
     }
 };
+
+///Grabbed Geeks for Geeks Huffman Code algorithm
+///https://www.geeksforgeeks.org/huffman-coding-greedy-algo-3/
+///with some alterations
 
 // A Huffman tree node
 struct MinHeapNode {
@@ -38,13 +41,10 @@ struct MinHeapNode {
     // Left and right child
     MinHeapNode *left, *right;
  
-    MinHeapNode(char data, unsigned freq)
- 
-    {
- 
+    MinHeapNode(Pair p){
         left = right = NULL;
-        this->data = data;
-        this->freq = freq;
+        this->data = p.character;
+        this->freq = p.frequency;
     }
 };
  
@@ -52,13 +52,16 @@ struct MinHeapNode {
 // two heap nodes (needed in min heap)
 struct compare {
  
-    bool operator()(MinHeapNode* l, MinHeapNode* r)
- 
-    {
-        return (l->freq > r->freq);
+    bool operator()(MinHeapNode* l, MinHeapNode* r){
+        if(l->freq == r->freq){
+            return (l->data < r->data);
+        }
+        else{
+            return (l->freq > r->freq);
+        }
     }
 };
- 
+
 // Prints huffman codes from
 // the root of Huffman Tree.
 void printCodes(struct MinHeapNode* root, string str)
@@ -73,21 +76,18 @@ void printCodes(struct MinHeapNode* root, string str)
     printCodes(root->left, str + "0");
     printCodes(root->right, str + "1");
 }
- 
- ///Grabbed Geeks for Geeks Huffman Code algorithm
- ///https://www.geeksforgeeks.org/huffman-coding-greedy-algo-3/
 
 // The main function that builds a Huffman Tree and
 // print codes by traversing the built Huffman Tree
-void HuffmanCodes(char data[], int freq[], int size, std::priority_queue<Pair*,vector<Pair*>)
+void HuffmanCodes(vector<Pair> pairs)
 {
     struct MinHeapNode *left, *right, *top;
  
     // Create a min heap & inserts all characters of data[]
     priority_queue<MinHeapNode*, vector<MinHeapNode*>, compare> minHeap;
  
-    for (int i = 0; i < size; ++i)
-        minHeap.push(new MinHeapNode(data[i], freq[i]));
+    for (int i = 0; i < pairs.size(); ++i)
+        minHeap.push(new MinHeapNode(pairs.at(i)));
  
     // Iterate while size of heap doesn't become 1
     while (minHeap.size() != 1) {
@@ -107,7 +107,8 @@ void HuffmanCodes(char data[], int freq[], int size, std::priority_queue<Pair*,v
         // of this new node. Add this node
         // to the min heap '$' is a special value
         // for internal nodes, not used
-        top = new MinHeapNode('$', left->freq + right->freq);
+        Pair temp('$',left->freq + right->freq);
+        top = new MinHeapNode(temp);
  
         top->left = left;
         top->right = right;
@@ -245,7 +246,7 @@ int main(){
     getPairs(firstFile, pairs);
 
     for(int i = 0; i < pairs.size(); i++){
-        cout << pairs.at(i).character << " " << pairs.at(i).freqeuency << endl;
+        cout << pairs.at(i).character << " " << pairs.at(i).frequency << endl;
     }
 
     cout << endl;
@@ -265,19 +266,5 @@ int main(){
         cout << endl << endl;
     }
 
-    std::priority_queue<Pair*,vector<Pair*>, priority> q = createPriorityQueue(pairs);
-
-    char* characters = new char[q.size()];
-    int* frequencies = new int[q.size()];
-    int count = 0;
-
-    while (!q.empty()) {
-		Pair* p = q.top();
-		characters[count] = p->character;
-        frequencies[count] = p->freqeuency;
-		q.pop();
-        count++;
-	}
-
-    HuffmanCodes(characters, frequencies, count);
+    HuffmanCodes(pairs);
 }
