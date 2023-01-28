@@ -8,6 +8,11 @@ using namespace std;
 struct Pair{
     char character;
     int frequency;
+
+    Pair(){
+        character = -1;
+        frequency = -1;
+    }
     Pair(char c, int f){
         character = c;
         frequency = f;
@@ -15,15 +20,10 @@ struct Pair{
 };
 
 struct Code{
-   int compressionCode;
+   string compressionCode;
    vector<int> locations; 
 };
 
-struct priority {
-    bool operator()(Pair* p, Pair* p2){
-        
-    }
-};
 
 ///Grabbed Geeks for Geeks Huffman Code algorithm
 ///https://www.geeksforgeeks.org/huffman-coding-greedy-algo-3/
@@ -50,11 +50,11 @@ struct MinHeapNode {
  
 // For comparison of
 // two heap nodes (needed in min heap)
-struct compare {
+struct compareMinHeap {
  
     bool operator()(MinHeapNode* l, MinHeapNode* r){
         if(l->freq == r->freq){
-            return (l->data < r->data);
+            return (l->data > r->data);
         }
         else{
             return (l->freq > r->freq);
@@ -66,26 +66,44 @@ struct compare {
 // the root of Huffman Tree.
 void printCodes(struct MinHeapNode* root, string str)
 {
- 
     if (!root)
         return;
  
-    if (root->data != '$')
-        cout << root->data << ": " << str << "\n";
+    if (root->data != '\0'){
+        cout << "Symbol: " << root->data << ", Frequency: " << root->freq << ", Code: " << str << "\n";
+    }
  
     printCodes(root->left, str + "0");
     printCodes(root->right, str + "1");
 }
 
+//Go through the tree and extract characters from code positions
+void extractCodes(struct MinHeapNode* root, string code, vector<Code> &codes)
+{
+    if (!root)
+        return;
+ 
+    if (root->data != '\0'){
+        for(int i = 0; i < codes.size(); i++){
+            if(codes.at(i).compressionCode == code){
+                codes.at(i).compressionCode = root->data;
+            }
+        }
+    }
+ 
+    extractCodes(root->left, code + "0", codes);
+    extractCodes(root->right, code + "1", codes);
+}
+
 // The main function that builds a Huffman Tree and
 // print codes by traversing the built Huffman Tree
-void HuffmanCodes(vector<Pair> pairs)
+void HuffmanCodes(vector<Pair> pairs, vector<Code> &codes)
 {
     struct MinHeapNode *left, *right, *top;
  
     // Create a min heap & inserts all characters of data[]
-    priority_queue<MinHeapNode*, vector<MinHeapNode*>, compare> minHeap;
- 
+    priority_queue<MinHeapNode*, vector<MinHeapNode*>, compareMinHeap> minHeap;
+    
     for (int i = 0; i < pairs.size(); ++i)
         minHeap.push(new MinHeapNode(pairs.at(i)));
  
@@ -107,7 +125,7 @@ void HuffmanCodes(vector<Pair> pairs)
         // of this new node. Add this node
         // to the min heap '$' is a special value
         // for internal nodes, not used
-        Pair temp('$',left->freq + right->freq);
+        Pair temp('\0',left->freq + right->freq);
         top = new MinHeapNode(temp);
  
         top->left = left;
@@ -119,36 +137,9 @@ void HuffmanCodes(vector<Pair> pairs)
     // Print Huffman codes using
     // the Huffman tree built above
     printCodes(minHeap.top(), "");
+    extractCodes(minHeap.top(), "", codes);
 }
-
 ///End of Geeks for Geeks huffman code
-
-/*
-struct HuffmanTree{
-    struct node{
-        int frequency;
-        int character;
-        node* left;
-        node* right;
-    };
-
-    node* root;
-
-    HuffmanTree(){
-        root == nullptr;
-    }
-
-    node* addNode(node* current, node* newNode){
-        if(root == nullptr){
-            root = newNode;
-            return root;
-        }
-
-        if(newNode->frequency < )
-    }
-};
-
-*/
 
 void getPairs(ifstream &infile, vector<Pair> &pairs){
 
@@ -156,12 +147,15 @@ void getPairs(ifstream &infile, vector<Pair> &pairs){
 
     while(!infile.eof()){
         Pair pair;
-        string temp;
-        infile >> temp;
+        getline(infile, temp);
+
         char character = temp.at(0);
+
+        string frequency = "";
+        frequency += temp.at(2);
+
         pair.character = character;
-        infile >> temp;
-        pair.freqeuency = stoi(temp);
+        pair.frequency = stoi(frequency);
         pairs.push_back(pair);
     }
 }
@@ -174,14 +168,13 @@ void getLocations(ifstream &infile, vector<Code> &codes){
     while(!infile.eof()){
 
         Code code;
-        int compressionCode;
+        string compressionCode;
         vector<int> locations;
 
         getline(infile, line);
         string first = line.substr(0,line.find(' '));
         line = line.substr(line.find(' ')+1);
-        cout << line;
-        compressionCode = stoi(first);
+        compressionCode = first;
 
         while(line != ""){
             
@@ -196,7 +189,6 @@ void getLocations(ifstream &infile, vector<Code> &codes){
             }
 
             line = line.substr(line.find(' ')+1);
-            cout << line;
             locations.push_back(stoi(location));
 
             if(location == ""){
@@ -210,16 +202,22 @@ void getLocations(ifstream &infile, vector<Code> &codes){
     }
 }
 
-std::priority_queue<Pair*,vector<Pair*>, priority>  createPriorityQueue(vector<Pair> &pairs){
+string decodeMessage(string message, vector<Code> &codes){
 
-    std::priority_queue<Pair*,vector<Pair*>, priority> q;
-    
-    for(int i = 0; i < pairs.size(); i++){
-        Pair* p = &pairs[i];
-        q.push(p);
+    for(int i = 0; i < codes.size(); i++){
+        for(int k = 0; k < codes.at(i).locations.size(); k++){
+
+            int location = codes.at(i).locations.at(k);
+
+            while(message.size() < location+1){
+                message += " ";
+            }
+
+            message.at(location) = codes.at(i).compressionCode.at(0);
+        }
     }
 
-    return q;
+    return message;
 }
 
 int main(){
@@ -245,26 +243,43 @@ int main(){
 
     getPairs(firstFile, pairs);
 
-    for(int i = 0; i < pairs.size(); i++){
-        cout << pairs.at(i).character << " " << pairs.at(i).frequency << endl;
+    /*
+    int i, j;
+    for (i = 0; i < pairs.size() - 1; i++){
+        // Last i elements are already in place
+        for (j = 0; j < pairs.size() - i - 1; j++)
+            if (pairs.at(j).frequency > pairs.at(j + 1).frequency){
+                Pair temp = pairs.at(j);
+                pairs.at(j) = pairs.at(j+1);
+                pairs.at(j+1) = temp;
+            }
     }
 
-    cout << endl;
+    
+        for(int i = 0; i < pairs.size(); i++){
+            cout << pairs.at(i).character << " " << pairs.at(i).frequency << endl;
+        }
+        cout << endl;
+    */
 
     cin >> secondFileName;
     secondFile.open(secondFileName);
 
     getLocations(secondFile, codes);
 
-    cout << endl << endl;
+    //for(int i = 0; i < codes.size(); i++){
+    //    cout << codes.at(i).compressionCode << " ";
+    //    for(int k = 0; k < codes.at(i).locations.size(); k++){
+    //        cout << codes.at(i).locations.at(k) << " ";
+    //    } 
+    //    cout << endl << endl;
+    //}
 
-    for(int i = 0; i < codes.size(); i++){
-        cout << codes.at(i).compressionCode << " ";
-        for(int k = 0; k < codes.at(i).locations.size(); k++){
-            cout << codes.at(i).locations.at(k) << " ";
-        } 
-        cout << endl << endl;
-    }
+    HuffmanCodes(pairs, codes);
 
-    HuffmanCodes(pairs);
+    string message = "";
+
+    message = decodeMessage(message, codes);
+
+    cout << "Original message: " << message;
 }
