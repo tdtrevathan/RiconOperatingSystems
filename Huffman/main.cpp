@@ -2,9 +2,14 @@
 #include <fstream>
 #include <vector>
 #include <queue>
+#include <pthread.h>
+#include <stdio.h>
+#include <time.h>
 
 using namespace std;
 
+#define NTHREADS 26
+ 
 struct Pair{
     char character;
     int frequency;
@@ -24,7 +29,24 @@ struct Code{
    vector<int> locations; 
 };
 
+struct DecodeVariable{
 
+    struct MinHeapNode* root;
+    string nodeCode;
+    Code* code;
+
+    DecodeVariable(){
+        root = nullptr;
+        nodeCode = "";
+        code = NULL;
+    }
+
+    DecodeVariable( MinHeapNode* r, string nCode, Code* c){
+        root = r;
+        nodeCode = nCode;
+        code = c;
+    }
+};
 ///Grabbed Geeks for Geeks Huffman Code algorithm
 ///https://www.geeksforgeeks.org/huffman-coding-greedy-algo-3/
 ///with some alterations
@@ -37,6 +59,8 @@ struct MinHeapNode {
  
     // Frequency of the character
     unsigned freq;
+
+    unsigned seq = 0;
  
     // Left and right child
     MinHeapNode *left, *right;
@@ -47,22 +71,7 @@ struct MinHeapNode {
         this->freq = p.frequency;
     }
 };
- 
-// For comparison of
-// two heap nodes (needed in min heap)
-struct compareMinHeap {
- 
-    bool operator()(MinHeapNode* l, MinHeapNode* r){
-        if(l->freq == r->freq){
-            return (l->data > r->data);
-        }
-        else{
-            return (l->freq > r->freq);
-        }
-    }
-};
-
-// Prints huffman codes from
+ // Prints huffman codes from
 // the root of Huffman Tree.
 void printCodes(struct MinHeapNode* root, string str)
 {
@@ -76,40 +85,97 @@ void printCodes(struct MinHeapNode* root, string str)
     printCodes(root->left, str + "0");
     printCodes(root->right, str + "1");
 }
+// For comparison of
+// two heap nodes (needed in min heap)
+struct compareMinHeap {
+    
+    bool operator()(MinHeapNode* l, MinHeapNode* r){
 
-//Go through the tree and extract characters from code positions
-void extractCodes(struct MinHeapNode* root, string code, vector<Code> &codes)
-{
-    if (!root)
-        return;
- 
-    if (root->data != '\0'){
-        for(int i = 0; i < codes.size(); i++){
-            if(codes.at(i).compressionCode == code){
-                codes.at(i).compressionCode = root->data;
+        if(l->freq == r->freq){
+            if(l->data == r->data){
+                return (l->seq < r->seq);
+            }
+            else{
+                return (l->data > r->data);
             }
         }
+        else{
+            return (l->freq > r->freq);
+        }
     }
- 
-    extractCodes(root->left, code + "0", codes);
-    extractCodes(root->right, code + "1", codes);
+};
+
+//Go through the tree and extract characters from code positions
+void* extractCodes(void * decodeVariable){
+
+    DecodeVariable* variable = (DecodeVariable*) decodeVariable;
+
+    if (!variable->root)
+        return (void *)nullptr;
+
+    if(variable->code->compressionCode == variable->nodeCode){
+        variable->code->compressionCode = variable->root->data;
+    }
+
+    MinHeapNode* tempRoot = variable->root;
+    string tempCode = variable->nodeCode;
+
+    variable->root = variable->root->left;
+    variable->nodeCode += "0";
+
+    extractCodes((void *)variable);
+
+    variable->root = tempRoot->right;
+    variable->nodeCode = tempCode + "1";
+
+    extractCodes((void *)variable);
+}
+
+void printQueue(priority_queue<MinHeapNode*, vector<MinHeapNode*>, compareMinHeap> queue){
+    
+    while(!queue.empty()){
+        MinHeapNode* temp = queue.top();
+        queue.pop();
+
+        if( temp->data == '\0'){
+            string left = "";
+            left += temp->left->data;
+            string right = "";
+            right += temp->right->data;
+            if(temp->left->data  == '\0'){
+                left = "null";
+            }
+            else if (temp->left->data  == ' '){
+                left = "space";
+            }
+            if(temp->right->data  == '\0'){
+                right = "null";
+            }
+            else if (temp->right->data  == ' '){
+                right = "space";
+            }
+            cout << "root values: " << left << " " << right << " ";
+        }
+        cout << "char: " << temp->data << " freq: " << temp->freq << endl;
+    }
+    cout << endl;
 }
 
 // The main function that builds a Huffman Tree and
 // print codes by traversing the built Huffman Tree
-void HuffmanCodes(vector<Pair> pairs, vector<Code> &codes)
+MinHeapNode* HuffmanCodes(priority_queue<MinHeapNode*, vector<MinHeapNode*>, compareMinHeap>& minHeap, vector<Pair> pairs, vector<Code> &codes)
 {
     struct MinHeapNode *left, *right, *top;
- 
-    // Create a min heap & inserts all characters of data[]
-    priority_queue<MinHeapNode*, vector<MinHeapNode*>, compareMinHeap> minHeap;
-    
-    for (int i = 0; i < pairs.size(); ++i)
+
+    for (int i = 0; i < pairs.size(); ++i){
         minHeap.push(new MinHeapNode(pairs.at(i)));
- 
+    }
+
+    //printQueue(minHeap);
+
+    int count = 0;
     // Iterate while size of heap doesn't become 1
     while (minHeap.size() != 1) {
- 
         // Extract the two minimum
         // freq items from min heap
         left = minHeap.top();
@@ -123,21 +189,29 @@ void HuffmanCodes(vector<Pair> pairs, vector<Code> &codes)
         // two nodes frequencies. Make the
         // two extracted node as left and right children
         // of this new node. Add this node
-        // to the min heap '$' is a special value
+        // to the min heap '\0' is a special value
         // for internal nodes, not used
         Pair temp('\0',left->freq + right->freq);
+
+
         top = new MinHeapNode(temp);
- 
+        top->seq = count;
+        count++;
         top->left = left;
         top->right = right;
  
         minHeap.push(top);
+        //printQueue(minHeap);
+        //cout << endl << endl;
+        //printCodes(minHeap.top(), "");
+        //cout << endl << endl;
     }
  
     // Print Huffman codes using
     // the Huffman tree built above
     printCodes(minHeap.top(), "");
-    extractCodes(minHeap.top(), "", codes);
+
+    return minHeap.top();
 }
 ///End of Geeks for Geeks huffman code
 
@@ -220,6 +294,24 @@ string decodeMessage(string message, vector<Code> &codes){
     return message;
 }
 
+void bubbleSort(vector<Pair> &pairs){
+    int i, j;
+    for (i = 0; i < pairs.size() - 1; i++){
+        // Last i elements are already in place
+        for (j = 0; j < pairs.size() - i - 1; j++)
+            if (pairs.at(j).frequency > pairs.at(j + 1).frequency){
+                Pair temp = pairs.at(j);
+                pairs.at(j) = pairs.at(j+1);
+                pairs.at(j+1) = temp;
+            }
+            else if(pairs.at(j).frequency == pairs.at(j + 1).frequency && (pairs.at(j).character > pairs.at(j + 1).character)){
+                Pair temp = pairs.at(j);
+                pairs.at(j) = pairs.at(j+1);
+                pairs.at(j+1) = temp;
+            }
+    }
+}
+
 int main(){
 
     ifstream firstFile;
@@ -227,6 +319,9 @@ int main(){
 
     string firstFileName;
     string secondFileName;
+
+    pthread_t tid[NTHREADS];
+    static DecodeVariable variables[NTHREADS];
 
     cin >> firstFileName;
 
@@ -242,40 +337,36 @@ int main(){
     int count = 0;
 
     getPairs(firstFile, pairs);
-
-    /*
-    int i, j;
-    for (i = 0; i < pairs.size() - 1; i++){
-        // Last i elements are already in place
-        for (j = 0; j < pairs.size() - i - 1; j++)
-            if (pairs.at(j).frequency > pairs.at(j + 1).frequency){
-                Pair temp = pairs.at(j);
-                pairs.at(j) = pairs.at(j+1);
-                pairs.at(j+1) = temp;
-            }
-    }
-
+    bubbleSort(pairs);
     
-        for(int i = 0; i < pairs.size(); i++){
-            cout << pairs.at(i).character << " " << pairs.at(i).frequency << endl;
-        }
-        cout << endl;
-    */
-
     cin >> secondFileName;
     secondFile.open(secondFileName);
 
     getLocations(secondFile, codes);
 
-    //for(int i = 0; i < codes.size(); i++){
-    //    cout << codes.at(i).compressionCode << " ";
-    //    for(int k = 0; k < codes.at(i).locations.size(); k++){
-    //        cout << codes.at(i).locations.at(k) << " ";
-    //    } 
-    //    cout << endl << endl;
-    //}
+    priority_queue<MinHeapNode*, vector<MinHeapNode*>, compareMinHeap> minHeap;
 
-    HuffmanCodes(pairs, codes);
+    MinHeapNode* root;
+    root = HuffmanCodes(minHeap, pairs, codes);
+
+    for(int i = 0; i < codes.size(); i++){
+
+        Code* code = &codes.at(i);
+        DecodeVariable var(root, "", code);
+        variables[i] = var;
+
+        //extractCodes((void*) &variables[i]);
+        if (pthread_create(&tid[i], NULL, extractCodes, (void *) &variables[i])){
+            fprintf(stderr, "Error could not create thread");
+            return 1;
+        }
+
+        codes.at(i).compressionCode = variables[i].code->compressionCode;
+    }
+
+    for(int i = 0; i < codes.size(); i++){
+        pthread_join(tid[i], NULL);
+    }
 
     string message = "";
 
