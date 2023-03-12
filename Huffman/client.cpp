@@ -53,7 +53,6 @@ struct DecodeVariable{
     }
 };
 
-
 void decodeMessage(string* message, Code* code){
 
     for(int k = 0; k < code->locations.size(); k++){
@@ -74,12 +73,15 @@ void* sendCodeToServer(void* decodeVariable){
     
     DecodeVariable* variable = (DecodeVariable*) decodeVariable;
 
+    server = variable->server;
+
     char buffer[256];
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
-    if (sockfd < 0) 
-        error("ERROR opening socket");
+    if (sockfd < 0) {
+        cout << "ERROR opening socket";
+    }
 
 
     if (variable->server == NULL) {
@@ -94,67 +96,55 @@ void* sendCodeToServer(void* decodeVariable){
 
     serv_addr.sin_port = htons(variable->portnumber);
 
-    if (connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr)) < 0) 
-        error("ERROR connecting");
-
-    printf("Please enter the message: ");
-
-    bzero(buffer,256);
-    fgets(buffer,255,stdin);
-
-    int sizeOfString = sizeof(variable->code->compressionCode);
-
-    n = write(sockfd, &sizeOfString, sizeof(int));
-
-    if (n < 0) 
-         error("ERROR writing to socket");
+    if (connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr)) < 0) {
+        cout << "ERROR connecting";
+    }
 
     bzero(buffer,256);
+
+    string temp = variable->code->compressionCode;
+    char* char_array = new char[temp.size()+1];
+
+
+    int lengthOfString = temp.size()+1;
+
+    n = write(sockfd, &lengthOfString, sizeof(int));
+
+    if (n < 0) {
+         cout << "ERROR writing to socket" ;
+    }
 
     n = read(sockfd,buffer,255);
+    strcpy(buffer, temp.c_str());
 
-    //if (n < 0) 
-    //    error("ERROR reading from socket");
-//
-    //n = write(sockfd,&variable->code->compressionCode,sizeof(variable->code->compressionCode));
-//
-    //if (n < 0) 
-    //     error("ERROR writing to socket");
-//
-    //n = read(sockfd,buffer,255);
+    if (n < 0) {
+        cout << "ERROR reading from socket";
+    }
 
-    //if (n < 0) 
-    //    error("ERROR reading from socket");
+    n = write(sockfd,&buffer, 255);
 
+    if (n < 0) {
+        cout << "ERROR writing to socket";
+    }
 
+    char result = '\0';
 
-    printf("%s\n",buffer);
+    n = read(sockfd,&result,sizeof(char));
+
+    if (n < 0) {
+        cout << "ERROR reading from socket";
+    }
+    
+    string resultString = "";
+    resultString += result;
+
+    variable->code->compressionCode = resultString;
+    
+    decodeMessage(variable->message, variable->code);
+
     close(sockfd);
     return 0;
 }
-
-//void* extractCodes(void * decodeVariable){
-//
-//    DecodeVariable* variable = (DecodeVariable*) decodeVariable;
-//
-//    if(variable->code->compressionCode == variable->nodeCode){
-//        variable->code->compressionCode = variable->root->data;
-//        decodeMessage(variable->message, variable->code);
-//    }
-//
-//    MinHeapNode* tempRoot = variable->root;
-//    string tempCode = variable->nodeCode;
-//
-//    variable->root = variable->root->left;
-//    variable->nodeCode += "0";
-//
-//    extractCodes((void *)variable);
-//
-//    variable->root = tempRoot->right;
-//    variable->nodeCode = tempCode + "1";
-//
-//    extractCodes((void *)variable);
-//}
 
 //save input into vector of huffman codes with their corresponding locations
 void getLocations(string line, vector<Code> &codes){
@@ -236,9 +226,12 @@ int main(int argc, char *argv[])
         //write it to message
 
 
-        Code *code = &codes.at(i);
-        DecodeVariable var("", code, messagePtr, server, portno);
+        //Code *code = &codes.at(0);
+        DecodeVariable var("", &codes.at(i), messagePtr, server, portno);
         variables[i] = var;
+
+        //sendCodeToServer(&variables[0]);
+
         if (pthread_create(&tid[i], NULL, sendCodeToServer, &variables[i]))
         {
             fprintf(stderr, "Error could not create thread");
@@ -249,11 +242,6 @@ int main(int argc, char *argv[])
     {
         pthread_join(tid[i], NULL);
     }
-
-
-
-    
-
 
     cout << "Original message: " << message;
 }
