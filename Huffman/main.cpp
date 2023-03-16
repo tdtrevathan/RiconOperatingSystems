@@ -96,33 +96,33 @@ struct compareMinHeap {
 };
 
 
+char extractCodes(MinHeapNode* root, string targetCode, string nodeCode){
 
-//Go through the tree and extract characters from code positions
-//void* extractCodes(void * decodeVariable){
-//
-//    DecodeVariable* variable = (DecodeVariable*) decodeVariable;
-//
-//    if (!variable->root)
-//        return (void *)nullptr;
-//
-//    if(variable->code->compressionCode == variable->nodeCode){
-//        variable->code->compressionCode = variable->root->data;
-//        decodeMessage(variable->message, variable->code);
-//    }
-//
-//    MinHeapNode* tempRoot = variable->root;
-//    string tempCode = variable->nodeCode;
-//
-//    variable->root = variable->root->left;
-//    variable->nodeCode += "0";
-//
-//    extractCodes((void *)variable);
-//
-//    variable->root = tempRoot->right;
-//    variable->nodeCode = tempCode + "1";
-//
-//    extractCodes((void *)variable);
-//}
+    char result;
+
+    if (!root)
+        return '\0';
+
+    if(targetCode == nodeCode){
+        return root->data;
+    }
+
+    MinHeapNode* tempRoot = root;
+    string tempCode = nodeCode;
+
+    root = root->left;
+    nodeCode += "0";
+
+    result = extractCodes(root, targetCode, nodeCode);
+
+    if(result == '\0'){
+        root = tempRoot->right;
+        nodeCode = tempCode + "1";
+
+        result = extractCodes(root, targetCode, nodeCode);
+    }
+    return result;
+}
 
 // The main function that builds a Huffman Tree and
 // print codes by traversing the built Huffman Tree
@@ -275,12 +275,16 @@ int main(int argc, char* argv[]){
 
         listen(sockfd, 52);
         clilen = sizeof(cli_addr);
-        newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, (socklen_t *)&clilen);
+        
 
     for(int i = 0; i < pairs.size(); i++)
     {
+        newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, (socklen_t *)&clilen);
+
         if (fork() == 0)
         {
+
+
             if (newsockfd < 0)
             {
                 cout << "ERROR on accept";
@@ -288,24 +292,41 @@ int main(int argc, char* argv[]){
             }
 
             bzero(buffer, 256);
-            int sizeOfMessage;
+            int lengthOfMessage = 0;
 
-            n = read(newsockfd, &sizeOfMessage, sizeof(int));
+            n = read(newsockfd, &lengthOfMessage, sizeof(int));
 
             if (n < 0)
             {
                 cout << "ERROR reading from socket";
                 return 1;
             }
+        
 
             n = write(newsockfd, "I got your message", 18);
+            
+            if (n < 0)
+            {
+                cout << "ERROR writing to socket";
+                return 1;
+            }
 
-            string value;
-            n = read(newsockfd, &value, sizeOfMessage + 1);
+            char* char_array = new char[lengthOfMessage];
 
-            cout << "Value = " << value << endl;
+            n = read(newsockfd, &buffer, 255);
 
-            n = write(newsockfd, "I got your message", 18);
+            string temp = "";
+
+            //dont count the null
+            lengthOfMessage--;
+
+            for(int i = 0; i < lengthOfMessage; i++){
+                temp += buffer[i];
+            }
+
+            char result = extractCodes(root,temp,"");
+
+            n = write(newsockfd, &result, sizeof(char));
 
             if (n < 0)
             {
