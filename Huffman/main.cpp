@@ -273,7 +273,7 @@ int main(int argc, char* argv[]){
             return 1;
         }
 
-        listen(sockfd, 26);
+        listen(sockfd, 52);
         clilen = sizeof(cli_addr);
         newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, (socklen_t *)&clilen);
 
